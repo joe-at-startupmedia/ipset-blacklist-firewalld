@@ -52,9 +52,11 @@ if ! iptables -nvL INPUT|command grep -q "match-set $IPSET_BLACKLIST_NAME"; then
     echo >&2 "# iptables -I INPUT ${IPTABLES_IPSET_RULE_NUMBER:-1} -m set --match-set $IPSET_BLACKLIST_NAME src -j DROP"
     exit 1
   fi
-  if ! iptables -I INPUT "${IPTABLES_IPSET_RULE_NUMBER:-1}" -m set --match-set "$IPSET_BLACKLIST_NAME" src -j DROP; then
+  if ! firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT "${IPTABLES_IPSET_RULE_NUMBER:-1}" -m set --match-set "$IPSET_BLACKLIST_NAME" src -j DROP; then
     echo >&2 "Error: while adding the --match-set ipset rule to iptables"
     exit 1
+  else
+    firewall-cmd --reload
   fi
 fi
 
