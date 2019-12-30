@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
 # usage update-blacklist.sh <configuration file>
-# eg: update-blacklist.sh /etc/ipset-blacklist/ipset-blacklist.conf
+# eg: update-blacklist.sh /etc/ipset-blacklist-firewalld/ipset-blacklist-firewalld.conf
 #
 function exists() { command -v "$1" >/dev/null 2>&1 ; }
 
 if [[ -z "$1" ]]; then
-  echo "Error: please specify a configuration file, e.g. $0 /etc/ipset-blacklist/ipset-blacklist.conf"
+  echo "Error: please specify a configuration file, e.g. $0 /etc/ipset-blacklist-firewalld/ipset-blacklist-firewalld.conf"
   exit 1
 fi
 
-# shellcheck source=ipset-blacklist.conf
+# shellcheck source=ipset-blacklist-firewalld.conf
 if ! source "$1"; then
   echo "Error: can't load configuration file $1"
   exit 1
@@ -32,7 +32,7 @@ if [[ ! -d $(dirname "$IP_BLACKLIST") ]]; then
 fi
 
 # create the ipset if needed (or abort if does not exists and FORCE=no)
-if ! firewall-cmd --permanent --get-ipsets | grep -q "$IPSET_BLACKLIST_NAME"; then
+if ! firewall-cmd --permanent --get-ipsets|command grep -q "$IPSET_BLACKLIST_NAME"; then
   if [[ ${FORCE:-no} != yes ]]; then
     echo >&2 "Error: ipset does not exist yet, add it using:"
     echo >&2 "# firewall-cmd --permanent --new-ipset=\"$IPSET_BLACKLIST_NAME\" --type=hash:net --option=family=inet --option=hashsize=\"${HASHSIZE:-16384}\" --option=maxelem=\"${MAXELEM:-65536}\""
@@ -45,7 +45,7 @@ if ! firewall-cmd --permanent --get-ipsets | grep -q "$IPSET_BLACKLIST_NAME"; th
 fi
 
 # add our ipset to drop zone (or abort if does not exists and FORCE=no)
-if ! firewall-cmd --permanent --zone=drop --list-sources | grep -q "ipset:$IPSET_BLACKLIST_NAME"; then
+if ! firewall-cmd --permanent --zone=drop --list-sources|command grep -q "ipset:$IPSET_BLACKLIST_NAME"; then
   # we may also have assumed that INPUT rule n°1 is about packets statistics (traffic monitoring)
   if [[ ${FORCE:-no} != yes ]]; then
     echo >&2 "Error: firewalld does not have the ipset added to the drop zone, add it using:"
