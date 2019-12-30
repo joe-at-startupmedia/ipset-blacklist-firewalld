@@ -3,6 +3,7 @@ ipset-blacklist-firewalld
 
 A Bash shell script which uses firewall-cmd to ban a large number of IP addresses published in IP blacklists. firewalld ipset uses a hashtable to store/fetch IP addresses and thus the IP lookup is a lot (!) faster than thousands of sequentially parsed iptables ban rules.
 
+This script is borrowed and modified from [ipset-blacklist](https://github.com/trick77/ipset-blacklist) to use firewalld and its built-in ipset implementation.
 
 ## Quick start for Debian/Ubuntu based installations
 1. wget -O /usr/local/sbin/update-blacklist.sh https://raw.githubusercontent.com/joe-at-startupmedia/ipset-blacklist-firewalld/master/update-blacklist.sh
