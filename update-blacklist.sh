@@ -16,8 +16,8 @@ if ! source "$1"; then
   exit 1
 fi
 
-if ! exists curl && exists egrep && exists grep && exists ipset && exists iptables && exists sed && exists sort && exists wc ; then
-  echo >&2 "Error: searching PATH fails to find executables among: curl egrep grep ipset iptables sed sort wc"
+if ! exists curl && exists egrep && exists grep && exists firewall-cmd && exists sed && exists sort && exists wc ; then
+  echo >&2 "Error: searching PATH fails to find executables among: curl egrep grep firewall-cmd sed sort wc"
   exit 1
 fi
 
@@ -26,34 +26,34 @@ if exists iprange && [[ ${OPTIMIZE_CIDR:-yes} != no ]]; then
   DO_OPTIMIZE_CIDR=yes
 fi
 
-if [[ ! -d $(dirname "$IP_BLACKLIST") || ! -d $(dirname "$IP_BLACKLIST_RESTORE") ]]; then
-  echo >&2 "Error: missing directory(s): $(dirname "$IP_BLACKLIST" "$IP_BLACKLIST_RESTORE"|sort -u)"
+if [[ ! -d $(dirname "$IP_BLACKLIST") ]]; then
+  echo >&2 "Error: missing directory(s): $(dirname "$IP_BLACKLIST" |sort -u)"
   exit 1
 fi
 
 # create the ipset if needed (or abort if does not exists and FORCE=no)
-if ! ipset list -n|command grep -q "$IPSET_BLACKLIST_NAME"; then
+if ! firewall-cmd --permanent --get-ipsets | grep -q "$IPSET_BLACKLIST_NAME"; then
   if [[ ${FORCE:-no} != yes ]]; then
     echo >&2 "Error: ipset does not exist yet, add it using:"
-    echo >&2 "# ipset create $IPSET_BLACKLIST_NAME -exist hash:net family inet hashsize ${HASHSIZE:-16384} maxelem ${MAXELEM:-65536}"
+    echo >&2 "# firewall-cmd --permanent --new-ipset=\"$IPSET_BLACKLIST_NAME\" --type=hash:net --option=family=inet --option=hashsize=\"${HASHSIZE:-16384}\" --option=maxelem=\"${MAXELEM:-65536}\""
     exit 1
   fi
-  if ! ipset create "$IPSET_BLACKLIST_NAME" -exist hash:net family inet hashsize "${HASHSIZE:-16384}" maxelem "${MAXELEM:-65536}"; then
+  if ! firewall-cmd --permanent --new-ipset="$IPSET_BLACKLIST_NAME" --type=hash:net --option=family=inet --option=hashsize="${HASHSIZE:-16384}" --option=maxelem="${MAXELEM:-65536}"; then
     echo >&2 "Error: while creating the initial ipset"
     exit 1
   fi
 fi
 
-# create the iptables binding if needed (or abort if does not exists and FORCE=no)
-if ! iptables -nvL INPUT|command grep -q "match-set $IPSET_BLACKLIST_NAME"; then
+# add our ipset to drop zone (or abort if does not exists and FORCE=no)
+if ! firewall-cmd --permanent --zone=drop --list-sources | grep -q "ipset:$IPSET_BLACKLIST_NAME"; then
   # we may also have assumed that INPUT rule n°1 is about packets statistics (traffic monitoring)
   if [[ ${FORCE:-no} != yes ]]; then
-    echo >&2 "Error: iptables does not have the needed ipset INPUT rule, add it using:"
-    echo >&2 "# iptables -I INPUT ${IPTABLES_IPSET_RULE_NUMBER:-1} -m set --match-set $IPSET_BLACKLIST_NAME src -j DROP"
+    echo >&2 "Error: firewalld does not have the ipset added to the drop zone, add it using:"
+    echo >&2 "# firewall-cmd --permanent --zone=drop --add-source=ipset:$IPSET_BLACKLIST_NAME"
     exit 1
   fi
-  if ! iptables -I INPUT "${IPTABLES_IPSET_RULE_NUMBER:-1}" -m set --match-set "$IPSET_BLACKLIST_NAME" src -j DROP; then
-    echo >&2 "Error: while adding the --match-set ipset rule to iptables"
+  if ! firewall-cmd --permanent --zone=drop --add-source=ipset:"$IPSET_BLACKLIST_NAME"; then
+    echo >&2 "Error: while adding ipset to the drop zone"
     exit 1
   fi
 fi
@@ -89,23 +89,8 @@ fi
 
 rm -f "$IP_BLACKLIST_TMP"
 
-# family = inet for IPv4 only
-cat >| "$IP_BLACKLIST_RESTORE" <<EOF
-create $IPSET_TMP_BLACKLIST_NAME -exist hash:net family inet hashsize ${HASHSIZE:-16384} maxelem ${MAXELEM:-65536}
-create $IPSET_BLACKLIST_NAME -exist hash:net family inet hashsize ${HASHSIZE:-16384} maxelem ${MAXELEM:-65536}
-EOF
-
-# can be IPv4 including netmask notation
-# IPv6 ? -e "s/^([0-9a-f:./]+).*/add $IPSET_TMP_BLACKLIST_NAME \1/p" \ IPv6
-sed -rn -e '/^#|^$/d' \
-  -e "s/^([0-9./]+).*/add $IPSET_TMP_BLACKLIST_NAME \\1/p" "$IP_BLACKLIST" >> "$IP_BLACKLIST_RESTORE"
-
-cat >> "$IP_BLACKLIST_RESTORE" <<EOF
-swap $IPSET_BLACKLIST_NAME $IPSET_TMP_BLACKLIST_NAME
-destroy $IPSET_TMP_BLACKLIST_NAME
-EOF
-
-ipset -file  "$IP_BLACKLIST_RESTORE" restore
+firewall-cmd --permanent --ipset="$IPSET_BLACKLIST_NAME" --add-entries-from-file="$IP_BLACKLIST"
+firewall-cmd --reload
 
 if [[ ${VERBOSE:-no} == yes ]]; then
   echo
