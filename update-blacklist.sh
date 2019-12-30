@@ -5,6 +5,13 @@
 #
 function exists() { command -v "$1" >/dev/null 2>&1 ; }
 
+function ipset_flush() {
+  FLUSH_TMP=$(mktemp)
+  firewall-cmd --permanent --ipset="$IPSET_BLACKLIST_NAME" --get-entries > "$FLUSH_TMP" 
+  firewall-cmd --permanent --ipset="$IPSET_BLACKLIST_NAME" --remove-entries-from-file="$FLUSH_TMP"
+  rm -f "$FLUSH_TMP"
+}
+
 if [[ -z "$1" ]]; then
   echo "Error: please specify a configuration file, e.g. $0 /etc/ipset-blacklist-firewalld/ipset-blacklist-firewalld.conf"
   exit 1
@@ -89,6 +96,7 @@ fi
 
 rm -f "$IP_BLACKLIST_TMP"
 
+ipset_flush
 firewall-cmd --permanent --ipset="$IPSET_BLACKLIST_NAME" --add-entries-from-file="$IP_BLACKLIST"
 firewall-cmd --reload
 
