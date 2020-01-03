@@ -51,16 +51,29 @@ if ! firewall-cmd --permanent --get-ipsets|command grep -q "$IPSET_BLACKLIST_NAM
   fi
 fi
 
-# add our ipset to drop zone (or abort if does not exists and FORCE=no)
-if ! firewall-cmd --permanent --zone=drop --list-sources|command grep -q "ipset:$IPSET_BLACKLIST_NAME"; then
+# add our ipset to drop zone sources (or abort if does not exists and FORCE=no)
+if ! firewall-cmd --permanent $IPSET_DROP_ZONE --list-sources|command grep -q "ipset:$IPSET_BLACKLIST_NAME"; then
   # we may also have assumed that INPUT rule n°1 is about packets statistics (traffic monitoring)
   if [[ ${FORCE:-no} != yes ]]; then
     echo >&2 "Error: firewalld does not have the ipset added to the drop zone, add it using:"
-    echo >&2 "# firewall-cmd --permanent --zone=drop --add-source=ipset:$IPSET_BLACKLIST_NAME"
+    echo >&2 "# firewall-cmd --permanent $IPSET_DROP_ZONE --add-source=ipset:$IPSET_BLACKLIST_NAME"
     exit 1
   fi
-  if ! firewall-cmd --permanent --zone=drop --add-source=ipset:"$IPSET_BLACKLIST_NAME"; then
+  if ! firewall-cmd --permanent $IPSET_DROP_ZONE --add-source=ipset:"$IPSET_BLACKLIST_NAME"; then
     echo >&2 "Error: while adding ipset to the drop zone"
+    exit 1
+  fi
+fi
+
+# create a rich rule for the ipset drop zone source (default if none specified)
+if [ "$IPSET_DROP_ZONE" != "--zone=drop" ] && ! firewall-cmd --permanent $IPSET_DROP_ZONE --list-rich-rules|command grep -q "ipset=$IPSET_BLACKLIST_NAME"; then
+  if [[ ${FORCE:-no} != yes ]]; then
+    echo >&2 "Error: firewalld does not have the source added to the drop zone, add it using:"
+    echo >&2 "# firewall-cmd --permanent $IPSET_DROP_ZONE --add-rich-rule='rule source ipset=$IPSET_BLACKLIST_NAME drop'"
+    exit 1
+  fi
+  if ! firewall-cmd --permanent $IPSET_DROP_ZONE --add-rich-rule="rule source ipset=$IPSET_BLACKLIST_NAME drop"; then
+    echo >&2 "Error: while adding ipset source to the drop zone"
     exit 1
   fi
 fi
