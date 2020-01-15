@@ -50,6 +50,10 @@ if ! firewall-cmd --permanent --get-ipsets|command grep -q "$IPSET_BLACKLIST_NAM
   fi
 fi
 
+# parameter substitution for the dropzone
+DEFAULT_ZONE="--zone=$(firewall-cmd --get-default-zone)"
+IPSET_DROP_ZONE=${IPSET_DROP_ZONE-$DEFAULT_ZONE}
+
 # add our ipset to drop zone sources (or abort if does not exists and FORCE=no)
 if ! firewall-cmd --permanent "$IPSET_DROP_ZONE" --list-sources|command grep -q "ipset:$IPSET_BLACKLIST_NAME"; then
   # we may also have assumed that INPUT rule n°1 is about packets statistics (traffic monitoring)
