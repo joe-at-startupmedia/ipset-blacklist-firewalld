@@ -21,7 +21,7 @@ to generate the /etc/ipset-blacklist-firewalld/ip-blacklist.list
 ## iptables filter rule
 ```
 # Enable blacklists
-firewall-cmd --permanent --ipset --ipset=blacklist --add-entries-from-file=/etc/ipset-blacklist-firewalld/ip-blacklist.list
+firewall-cmd --permanent --ipset=blacklist --add-entries-from-file=/etc/ipset-blacklist-firewalld/ip-blacklist.list
 firewall-cmd --reload
 ```
 Make sure to run this snippet in a firewall script or just insert it to /etc/rc.local.
